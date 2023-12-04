@@ -27,19 +27,21 @@
 _addon.name = 'toolbag'
 _addon.author = 'Syzak'
 _addon.version = '0.0.0'
-_addon.commands = { 'toolbag', 'tb', 'tool', 'tools', 'shihei', 'ino', 'shika', 'cho' }
+_addon.commands = { 'toolbag', 'tb', 'tool', 'tools' }
 
 require('tables')
 require('strings')
 require('logger')
 
 local config = require('config')
+local spells = require('resources').spells
 local texts = require('texts')
+
 
 -----------------------------
 -- List of all ninja tools --
 -----------------------------
-local tools = T {
+local ValidToolNames = T {
   'Chonofuda',
   'Furusumi',
   'Hiraishin',
@@ -63,9 +65,59 @@ local tools = T {
   'Uchitake',
 }
 
+local ToolDictionary = T {
+  { id = 1161, en = "Uchitake",        stack = 99 },
+  { id = 1167, en = "Kawahori-Ogi",    stack = 99 },
+  { id = 1170, en = "Makibishi",       stack = 99 },
+  { id = 1173, en = "Hiraishin",       stack = 99 },
+  { id = 1176, en = "Mizu-Deppo",      stack = 99 },
+  { id = 1179, en = "Shihei",          stack = 99 },
+  { id = 1182, en = "Jusatsu",         stack = 99 },
+  { id = 1185, en = "Kaginawa",        stack = 99 },
+  { id = 1188, en = "Sairui-Ran",      stack = 99 },
+  { id = 1191, en = "Kodoku",          stack = 99 },
+  { id = 1194, en = "Shinobi-Tabi",    stack = 99 },
+  { id = 2555, en = "Soshi",           stack = 99 },
+  { id = 2642, en = "Kabenro",         stack = 99 },
+  { id = 2643, en = "Jinko",           stack = 99 },
+  { id = 2644, en = "Ryuno",           stack = 99 },
+  { id = 2970, en = "Mokujin",         stack = 99 },
+  { id = 2971, en = "Inoshishinofuda", stack = 99 },
+  { id = 2972, en = "Shikanofuda",     stack = 99 },
+  { id = 2973, en = "Chonofuda",       stack = 99 },
+  { id = 5308, en = "Toolbag (Uchi)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5309, en = "Toolbag (Tsura)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5310, en = "Toolbag (Kawa)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5311, en = "Toolbag (Maki)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5312, en = "Toolbag (Hira)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5313, en = "Toolbag (Mizu)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5314, en = "Toolbag (Shihe)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5315, en = "Toolbag (Jusa)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5316, en = "Toolbag (Kagi)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5317, en = "Toolbag (Sai)",   cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5318, en = "Toolbag (Kodo)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5319, en = "Toolbag (Shino)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5417, en = "Toolbag (Sanja)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5734, en = "Toolbag (Soshi)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5863, en = "Toolbag (Kaben)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5864, en = "Toolbag (Jinko)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5865, en = "Toolbag (Ryuno)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5866, en = "Toolbag (Moku)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5867, en = "Toolbag (Ino)",   cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5868, en = "Toolbag (Shika)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 5869, en = "Toolbag (Cho)",   cast_time = 1, category = "Usable", stack = 12 },
+  { id = 6265, en = "Toolbag (Ranka)", cast_time = 1, category = "Usable", stack = 12 },
+  { id = 6266, en = "Toolbag (Furu)",  cast_time = 1, category = "Usable", stack = 12 },
+  { id = 8803, en = "Ranka",           stack = 99 },
+  { id = 8804, en = "Furusumi",        stack = 99 },
+}
+
 -----------------------
 -- Helpful Constants --
 -----------------------
+local ActionCastSpell = 4
+local ActionUseItem = 5
+
 local DisplayType = {
   Icon = 'Icon',
   SpellName = 'SpellName',
@@ -83,6 +135,23 @@ local UniversalTool = {
   Ino = 'Inoshishinofuda',
   Shika = 'Shikanofuda',
   Cho = 'Chonofuda',
+}
+
+-------------
+-- Baggage --
+-------------
+local GlobalBags = {
+  'Inventory',
+  'Satchel',
+  'Sack',
+  'Case',
+}
+
+local HomeBags = {
+  'Safe',
+  'Storage',
+  'Locker',
+  'Safe 2',
 }
 
 ----------------------------
@@ -188,6 +257,48 @@ local function createTextures(name)
   currentTexture = currentTexture + 1
 end
 
+--------------------------
+-- Update rendered text --
+--------------------------
+local function updateToolText(currentTools)
+  log('Updating tool text')
+  for tool, count in pairs(currentTools) do
+    if toolTexts[tool] then
+      toolTexts[tool]:text('x' .. count)
+    end
+  end
+end
+
+------------
+-- Search --
+------------
+local function getTools()
+  log('Grabbing Tools')
+  local inventory = T {}
+
+  for _, bag in ipairs(GlobalBags) do
+    local items = windower.ffxi.get_items(bag)
+    if items.enabled then
+      for _, item in ipairs(items) do
+        -- Look for any tools or toolbags
+        local foundItem = ToolDictionary:with('id', item.id)
+
+        -- If the tool is to be displayed, track the count
+        if foundItem and settings.display.tools:contains(foundItem.en) then
+          -- Add to the total or create the entry in the built inventory
+          if inventory[foundItem.en] then
+            inventory[foundItem.en] = inventory[foundItem.en] + item.count
+          else
+            inventory[foundItem.en] = item.count
+          end
+        end
+      end
+    end
+  end
+
+  return inventory
+end
+
 ------------------------
 -- Initialize Display --
 ------------------------
@@ -196,7 +307,14 @@ local function onLoad()
     return
   end
 
-  settings.display.tools:map(createTextures)
+  for _, name in ipairs(settings.display.tools) do
+    createTextures(name)
+  end
+
+  local currentTools = getTools()
+  updateToolText(currentTools)
+
+  initialized = true
 end
 
 -------------
@@ -204,7 +322,7 @@ end
 -------------
 local function onUnload()
   -- Destroy icons
-  for _, name in ipairs(tools) do
+  for _, name in ipairs(settings.display.tools) do
     local textureName = name .. '_toolbag_syz'
     windower.prim.delete(textureName)
   end
@@ -219,10 +337,29 @@ end
 -- Monitor Inventory --
 -----------------------
 local function onItemAdded(bag, index, id, count)
-
+  updateToolText(getTools())
 end
 
 local function onItemRemoved(bag, index, id, count)
+  updateToolText(getTools())
+end
+
+local function onAction(action)
+  -- Check if the the player is the action initiator and if the action is a spell or item usage
+  if (
+        action.actor_id ~= windower.ffxi.get_player().id
+        and action.category ~= ActionUseItem
+        and action.category ~= ActionCastSpell
+      )
+  then
+    return
+  end
+
+  if (action.category == ActionUseItem) then
+    updateToolText(getTools())
+  elseif (action.category == ActionCastSpell and spells[action.param].type == "Ninjutsu") then
+    updateToolText(getTools())
+  end
 end
 
 --------------------
@@ -247,6 +384,7 @@ windower.register_event('logout', 'unload', onUnload)
 -- Monitor
 windower.register_event('add item', onItemAdded)
 windower.register_event('remove item', onItemRemoved)
+windower.register_event('action', onAction)
 
 -- Listen
 windower.register_event('addon command', onAddonCommand)
