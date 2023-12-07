@@ -29,14 +29,17 @@ _addon.author = 'Syzak'
 _addon.version = '0.0.0'
 _addon.commands = { 'toolbag', 'tb', 'tool', 'tools' }
 
+-------------
+-- Imports --
+-------------
 require('tables')
 require('strings')
 require('logger')
 
+local chat = require('chat')
 local config = require('config')
 local spells = require('resources').spells
 local texts = require('texts')
-
 
 -----------------------------
 -- List of all ninja tools --
@@ -154,6 +157,11 @@ local HomeBags = {
   'Safe 2',
 }
 
+------------
+-- Player --
+------------
+local player = nil
+
 ----------------------------
 -- Text Visual Indicators --
 ----------------------------
@@ -166,6 +174,7 @@ local UpperBound = 35
 local defaults = {
   canMoveItems = false,
   canUseItems = false,
+  debug = false,
   display = {
     direction = Direction.Vertical,
     threshold = {
@@ -228,6 +237,15 @@ local toolTexts = T {}
 local initialized = false
 local currentTexture = 0
 
+-------------
+-- Helpers --
+-------------
+local function debug(str)
+  if (settings.debug) then
+    captionLog('Debug: ', string.char(0x1F, 0x79), str)
+  end
+end
+
 ----------------------------------
 -- Create and render tool icons --
 ----------------------------------
@@ -246,6 +264,8 @@ local function createTextures(name)
   windower.prim.set_fit_to_texture(textureName, true)
   windower.prim.set_position(textureName, actualX, actualY)
 
+
+  debug('Adding text...')
   -- Create the text object at the appropriate position
   local toolText = texts.new('x ??', settings.texts)
 
@@ -261,9 +281,8 @@ end
 -- Update rendered text --
 --------------------------
 local function updateToolText(currentTools)
-  log('Updating tool text')
   for tool, count in pairs(currentTools) do
-    if toolTexts[tool] then
+    if toolTexts:with(tool) then
       toolTexts[tool]:text('x' .. count)
     end
   end
@@ -273,7 +292,6 @@ end
 -- Search --
 ------------
 local function getTools()
-  log('Grabbing Tools')
   local inventory = T {}
 
   for _, bag in ipairs(GlobalBags) do
@@ -304,13 +322,22 @@ end
 ------------------------
 local function onLoad()
   if (initialized) then
+    warning('Attempting to reinitialize textures')
     return
   end
 
+  if (not player) then
+    player = windower.ffxi.get_player()
+  end
+
+  debug('Creating Textures')
   for _, name in ipairs(settings.display.tools) do
     createTextures(name)
   end
 
+  currentTexture = 0
+
+  debug('Generatnig Tool Count')
   local currentTools = getTools()
   updateToolText(currentTools)
 
@@ -331,6 +358,8 @@ local function onUnload()
   for _, v in pairs(toolTexts) do
     texts.destroy(v)
   end
+
+  initialized = false
 end
 
 -----------------------
@@ -347,7 +376,8 @@ end
 local function onAction(action)
   -- Check if the the player is the action initiator and if the action is a spell or item usage
   if (
-        action.actor_id ~= windower.ffxi.get_player().id
+        player
+        and action.actor_id ~= player.id
         and action.category ~= ActionUseItem
         and action.category ~= ActionCastSpell
       )
@@ -356,17 +386,57 @@ local function onAction(action)
   end
 
   if (action.category == ActionUseItem) then
-    updateToolText(getTools())
-  elseif (action.category == ActionCastSpell and spells[action.param].type == "Ninjutsu") then
-    updateToolText(getTools())
+    local it = getTools()
+    updateToolText(it)
+  elseif (action.category == ActionCastSpell and spells[action.param] and spells[action.param].type == "Ninjutsu") then
+    local it = getTools()
+    updateToolText(it)
   end
+end
+
+local function ON()
+  return string.color('ON', string.char(0x1F, 0x38))
+end
+
+local function OFF()
+  return string.color('OFF', string.char(0x1F, 0x39))
 end
 
 --------------------
 -- Addon Commands --
 --------------------
-local function onAddonCommand()
+local function onAddonCommand(...)
+  local args = T { ... }
+  local formattedArgs = args:map(string.lower)
 
+  if (formattedArgs:contains('debug')) then
+    settings.debug = not settings.debug
+    log('Debug mode: ' .. (settings.debug and ON() or OFF()))
+  end
+
+  if (formattedArgs:contains('move')) then
+    settings.canMoveItems = not settings.canMoveItems
+    log('Ability to move items between bags: ' .. (settings.canMoveItems and ON() or OFF()))
+  end
+
+  if (formattedArgs:contains('use')) then
+    settings.canUseItems = not settings.canUseItems
+    log('Ability to use toolbags: ' .. (settings.canUseItems and ON() or OFF()))
+  end
+
+  if (formattedArgs:contains('list')) then
+    log('Listing Settings')
+    log('Move Items: ' .. (settings.canMoveItems and ON() or OFF()))
+    log('Use Items: ' .. (settings.canUseItems and ON() or OFF()))
+  end
+
+  if (formattedArgs:contains('save all')) then
+    log('Saving settings for all characters')
+    config.save(settings, 'all')
+  elseif (formattedArgs:contains('save')) then
+    log('Saving settings for current character')
+    config.save(settings)
+  end
 end
 
 -- local function useItem()
